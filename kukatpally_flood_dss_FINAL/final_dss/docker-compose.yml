@@ -1,0 +1,57 @@
+version: "3.9"
+
+services:
+  # ── PostgreSQL + PostGIS (production) ──────────────────────────────────────
+  db:
+    image: postgis/postgis:15-3.3
+    container_name: flood_dss_db
+    environment:
+      POSTGRES_DB: flood_das
+      POSTGRES_USER: flood_user
+      POSTGRES_PASSWORD: flood_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flood_user -d flood_das"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── FastAPI backend ────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: flood_dss_backend
+    environment:
+      DATABASE_URL: postgresql://flood_user:flood_pass@db:5432/flood_das
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # ── Simulator (optional — runs 30-min heavy rainfall simulation) ──────────
+  simulator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: flood_dss_simulator
+    environment:
+      DATABASE_URL: postgresql://flood_user:flood_pass@db:5432/flood_das
+    volumes:
+      - .:/app
+    depends_on:
+      - backend
+    profiles:
+      - simulate   # Only starts with: docker-compose --profile simulate up
+    command: >
+      sh -c "sleep 5 && python -m backend.simulator --pattern heavy --duration 30 --interval 5 --api-url http://backend:8000"
+
+volumes:
+  postgres_data:
