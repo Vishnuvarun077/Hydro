@@ -1,0 +1,6 @@
+#!/home/srivishnuvarun/4th(Fourthyear)/8th_Sem/HYDRO/DSS/kukatpally_flood_dss_VERSION3/final_dss/venv/bin/python3
+import sys
+from numpy._configtool import main
+if __name__ == '__main__':
+    sys.argv[0] = sys.argv[0].removesuffix('.exe')
+    sys.exit(main())
