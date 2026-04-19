@@ -101,9 +101,10 @@ class CompareRequest(BaseModel):
 
 
 # ── Static files ──────────────────────────────────────────────────────────────
-frontend_dir = os.path.join(BASE_DIR, "frontend")
-if os.path.exists(frontend_dir):
-    app.mount("/static", StaticFiles(directory=frontend_dir), name="static")
+# Mount geojson files for direct access
+geojson_dir = os.path.join(BASE_DIR, "geojson")
+if os.path.exists(geojson_dir):
+    app.mount("/geojson_files", StaticFiles(directory=geojson_dir), name="geojson_files")
 
 @app.get("/", tags=["Root"])
 async def root():
@@ -111,6 +112,21 @@ async def root():
     if os.path.exists(index):
         return FileResponse(index)
     return {"message": "Flood DSS API running", "docs": "/docs"}
+
+@app.get("/styles.css", tags=["Frontend"])
+async def serve_css():
+    p = os.path.join(BASE_DIR, "frontend", "styles.css")
+    return FileResponse(p, media_type="text/css")
+
+@app.get("/app.js", tags=["Frontend"])
+async def serve_appjs():
+    p = os.path.join(BASE_DIR, "frontend", "app.js")
+    return FileResponse(p, media_type="application/javascript")
+
+@app.get("/app_integration.js", tags=["Frontend"])
+async def serve_integration():
+    p = os.path.join(BASE_DIR, "frontend", "app_integration.js")
+    return FileResponse(p, media_type="application/javascript")
 
 
 # ── Info ──────────────────────────────────────────────────────────────────────
@@ -367,7 +383,7 @@ async def ml_forecast(
     df_sorted["rainfall_3day_avg"] = df_sorted["actual_mm"].rolling(3, min_periods=1).mean().round(3)
 
     # Add discharge per day using Rational Method (Task 2 — day-wise precision)
-    TC_HOURS = 1.2
+    TC_HOURS = 6.88
     from .ml_model import daily_to_intensity
     from . import hydrology as _hyd
     df_sorted["intensity_mmhr"] = df_sorted["predicted_mm"].apply(
@@ -377,13 +393,14 @@ async def ml_forecast(
     df_sorted["discharge_m3s"] = df_sorted["intensity_mmhr"].apply(
         lambda i: _hyd.calculate_discharge_rational(i)
     )
-    # Alert level per day
-    def _alert(mm):
-        if mm >= 204.5: return "RED"
-        if mm >= 115.6: return "ORANGE"
-        if mm >= 64.5:  return "YELLOW"
-        return "NORMAL"
-    df_sorted["alert_level"] = df_sorted["predicted_mm"].apply(_alert)
+    # Combined alert level: max severity of IMD rainfall level + discharge level
+    _LEVELS = ["NORMAL", "YELLOW", "ORANGE", "RED"]
+    def _alert(row):
+        mm, q = row["predicted_mm"], row["discharge_m3s"]
+        rain_lv = "RED" if mm>=204.5 else "ORANGE" if mm>=115.6 else "YELLOW" if mm>=64.5 else "NORMAL"
+        disc_lv = "RED" if q>1000 else "ORANGE" if q>500 else "YELLOW" if q>_hyd.DISCHARGE_THRESHOLD_M3S else "NORMAL"
+        return _LEVELS[max(_LEVELS.index(rain_lv), _LEVELS.index(disc_lv))]
+    df_sorted["alert_level"] = df_sorted.apply(_alert, axis=1)
     df_sorted["exceeds_flood_threshold"] = (df_sorted["discharge_m3s"] > _hyd.DISCHARGE_THRESHOLD_M3S)
 
     # Monthly aggregates
@@ -406,9 +423,9 @@ async def ml_forecast(
         "total_predicted_mm": round(float(df_sorted["predicted_mm"].sum()), 1),
         "peak_predicted_mm": round(float(df_sorted["predicted_mm"].max()), 1),
         "alert_days": {
-            "yellow": int((df_sorted["predicted_mm"] >= 64.5).sum()),
-            "orange": int((df_sorted["predicted_mm"] >= 115.6).sum()),
-            "red":    int((df_sorted["predicted_mm"] >= 204.5).sum()),
+            "yellow": int((df_sorted["alert_level"] == "YELLOW").sum()),
+            "orange": int((df_sorted["alert_level"] == "ORANGE").sum()),
+            "red":    int((df_sorted["alert_level"] == "RED").sum()),
         },
         "flood_exceedance_days": int(df_sorted["exceeds_flood_threshold"].sum()),
         "daily": daily_records[[
@@ -443,7 +460,7 @@ async def simulate(req: SimulateRequest, db: Session = Depends(get_db)):
         raise HTTPException(400, str(e))
 
     # Average annual Tc for Zone 12 (from Assignment 2 morphometry)
-    TC_HOURS = 1.2  # hours — weighted average Tc from basin data
+    TC_HOURS = 6.88  # hours — weighted average Tc from basin data
 
     # For each predicted day, compute peak discharge per basin
     all_basin_results = []
@@ -615,7 +632,7 @@ async def compare_scenarios(req: CompareRequest):
     except (ValueError, FileNotFoundError) as e:
         raise HTTPException(400, str(e))
 
-    TC_HOURS = 1.2
+    TC_HOURS = 6.88
 
     def summarise(df, scenario):
         mean_intensity = daily_to_intensity(float(df["predicted_mm"].mean()), TC_HOURS)
