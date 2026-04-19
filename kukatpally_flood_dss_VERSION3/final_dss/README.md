@@ -65,6 +65,25 @@ flood_das/
 
 ## Quick Start — Option A: No Docker (Fastest)
 
+
+Open your terminal or Command Prompt and run the following commands:
+
+```bash
+cd final_dss
+
+# Create virtualenv and activate
+python3 -m venv venv
+source venv/bin/activate          # Mac/Linux
+# OR: venv\Scripts\activate       # Windows
+
+# Install dependencies
+pip install fastapi "uvicorn[standard]" websockets sqlalchemy aiosqlite \
+    pandas numpy scikit-learn joblib requests aiofiles rasterio matplotlib
+
+# Start the server
+uvicorn backend.main:app --host 0.0.0.0 --port 8000
+```
+
 ### Mac / Linux
 ```bash
 cd flood_das
@@ -241,5 +260,5 @@ python scripts/train_model.py  # (optional — model already included)
 ## Team
 
 GHMC Zone 12 Hydrological DSS  
-IIT Hyderabad / BITS Pilani — Hydrological Informatics  
+IIIT Hyderabad  
 Reference event: 13 October 2020 Hyderabad Floods
