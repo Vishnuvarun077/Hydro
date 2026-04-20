@@ -955,23 +955,48 @@ async function syncDash(simData) {
         const sync = await r.json();
         const live = sync.live;
         const el = id => document.getElementById(id);
-        if (el('rainfall-value'))    el('rainfall-value').textContent    = live.rainfall_mm.toFixed(1);
+
+        // Water level always comes from live sensors (simulation doesn't compute it)
         if (el('water-level-value')) el('water-level-value').textContent = live.water_level_m.toFixed(2);
-        if (el('discharge-value'))   el('discharge-value').textContent   = live.discharge_m3s.toFixed(1);
-        if (el('risk-level'))        el('risk-level').textContent        = live.risk_level;
-        if (el('risk-message'))      el('risk-message').textContent      = live.risk_message;
         if (el('alert-count'))       el('alert-count').textContent       = live.active_alerts;
-        const rcard = document.getElementById('risk-card');
-        if (rcard) rcard.className = `status-card risk-card ${live.risk_level.toLowerCase()}`;
+
         if (simData) {
+            // Use simulation values for rainfall intensity, discharge and risk
+            const peakBasin = (simData.basin_summary || []).find(b => b.basin_id === simData.peak_basin_id)
+                           || (simData.basin_summary || [])[0];
+            const peakIntensity = peakBasin ? peakBasin.rain_intensity_mmhr : 0;
+            const risk = (simData.overall_risk_level || 'NORMAL').toLowerCase();
+
+            if (el('rainfall-value'))  el('rainfall-value').textContent  = peakIntensity.toFixed(1);
+            if (el('discharge-value')) el('discharge-value').textContent = (simData.peak_discharge_m3s || 0).toFixed(1);
+            if (el('risk-level'))      el('risk-level').textContent      = simData.overall_risk_level || 'NORMAL';
+            if (el('risk-message'))    el('risk-message').textContent    = `Simulation: ${simData.scenario} | ${simData.year_range}`;
+            const rcard = document.getElementById('risk-card');
+            if (rcard) rcard.className = `status-card risk-card ${risk}`;
+
             if (el('est-discharge-value'))
                 el('est-discharge-value').textContent = `${(simData.peak_discharge_m3s||0).toFixed(2)} m³/s (${simData.scenario})`;
             if (el('selected-basin-id'))
                 el('selected-basin-id').textContent = `Peak Basin ${simData.peak_basin_id||'—'}`;
             if (el('simulation-results')) el('simulation-results').style.display = 'block';
             const ns = el('no-selection-msg'); if (ns) ns.style.display = 'none';
+
+            window.simModeActive = true;
+            const banner = document.getElementById('sim-mode-banner');
+            const label  = document.getElementById('sim-mode-label');
+            if (banner) banner.style.display = 'flex';
+            if (label)  label.textContent    = `${simData.scenario} | ${simData.year_range} — Peak Q: ${(simData.peak_discharge_m3s||0).toFixed(1)} m³/s`;
+        } else {
+            // No simulation — show live sensor values
+            if (el('rainfall-value'))  el('rainfall-value').textContent  = live.rainfall_mm.toFixed(1);
+            if (el('discharge-value')) el('discharge-value').textContent = live.discharge_m3s.toFixed(1);
+            if (el('risk-level'))      el('risk-level').textContent      = live.risk_level;
+            if (el('risk-message'))    el('risk-message').textContent    = live.risk_message;
+            const rcard = document.getElementById('risk-card');
+            if (rcard) rcard.className = `status-card risk-card ${live.risk_level.toLowerCase()}`;
         }
-        ['rainfall-value','water-level-value','discharge-value'].forEach(id => {
+
+        ['rainfall-value','discharge-value'].forEach(id => {
             const e = document.getElementById(id); if (!e) return;
             e.style.transition = 'color .4s'; e.style.color = '#00d4ff';
             setTimeout(() => e.style.color = '', 900);
