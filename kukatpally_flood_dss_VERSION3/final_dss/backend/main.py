@@ -41,7 +41,7 @@ from .models import Rainfall, WaterLevel, DischargeEstimate, Alert, SimulationRu
 from . import hydrology
 from .ml_model import (
     predict_scenario, get_model_metadata, get_available_scenarios, daily_to_intensity,
-    SCENARIO_FILES
+    train_model, MODEL_PATH, SCENARIO_FILES
 )
 
 # ── App setup ─────────────────────────────────────────────────────────────────
@@ -72,6 +72,21 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+# ── Auto-train ML model on first startup if model file is missing ─────────────
+@app.on_event("startup")
+async def auto_train_model():
+    if not MODEL_PATH.exists():
+        import asyncio
+        loop = asyncio.get_event_loop()
+        try:
+            metrics = await loop.run_in_executor(None, train_model)
+            print(f"[Startup] Model trained — R²={metrics['r2_score']}, MAE={metrics['mae_mm_day']} mm/day")
+        except Exception as e:
+            print(f"[Startup] Model training failed: {e}")
+    else:
+        print("[Startup] ML model found — skipping training.")
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────────

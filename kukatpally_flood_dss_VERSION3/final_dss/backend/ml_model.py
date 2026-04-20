@@ -15,6 +15,9 @@ from typing import Optional
 import joblib
 import numpy as np
 import pandas as pd
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import r2_score, mean_absolute_error
 
 logger = logging.getLogger(__name__)
 
@@ -36,9 +39,54 @@ FEATURES = [
 ]
 
 
+def train_model() -> dict:
+    """
+    Train a RandomForest model on historical climate data and save it to disk.
+    Called automatically at startup if the model file is missing.
+    Returns a dict with training metrics.
+    """
+    hist_path = CLIMATE_DIR / "historical_1990_2024.csv"
+    if not hist_path.exists():
+        raise FileNotFoundError(f"Training data not found: {hist_path}")
+
+    logger.info("Training RF model on %s ...", hist_path)
+    df = _prep_csv(hist_path)
+
+    X, y = df[FEATURES], df["rainfall_mm"]
+    X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.2, random_state=42)
+
+    model = RandomForestRegressor(
+        n_estimators=200, max_depth=12, random_state=42, n_jobs=-1
+    )
+    model.fit(X_tr, y_tr)
+
+    preds  = model.predict(X_te)
+    r2     = round(r2_score(y_te, preds), 4)
+    mae    = round(mean_absolute_error(y_te, preds), 4)
+
+    MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(model, MODEL_PATH)
+    logger.info("Model saved → %s  (R²=%.4f, MAE=%.4f mm/day)", MODEL_PATH, r2, mae)
+
+    # Update metadata
+    meta = json.loads(META_PATH.read_text()) if META_PATH.exists() else {}
+    meta.update({
+        "r2_score": r2,
+        "mae_mm_day": mae,
+        "n_estimators": 200,
+        "features": FEATURES,
+        "training_rows": len(X_tr),
+        "trained_at": pd.Timestamp.utcnow().isoformat(),
+    })
+    META_PATH.write_text(json.dumps(meta, indent=2))
+
+    return {"r2_score": r2, "mae_mm_day": mae, "training_rows": len(X_tr)}
+
+
 def _load_model():
     if not MODEL_PATH.exists():
-        raise FileNotFoundError(f"Model not found: {MODEL_PATH}. Run scripts/train_model.py first.")
+        logger.warning("Model not found — auto-training now. This takes ~30 seconds...")
+        train_model()
     return joblib.load(MODEL_PATH)
 
 
