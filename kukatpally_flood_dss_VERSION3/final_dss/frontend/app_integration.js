@@ -527,6 +527,7 @@ async function runSim() {
         if (!res.ok) { const e = await res.json(); alert('Error: ' + (e.detail || 'unknown')); return; }
         const data = await res.json();
         lastSim = data;
+        window.lastSimResult = data;   // expose for app.js basin click handler
         renderSim(data);
         await syncDash(data);
     } catch(e) { alert('Cannot reach API: ' + e.message); }

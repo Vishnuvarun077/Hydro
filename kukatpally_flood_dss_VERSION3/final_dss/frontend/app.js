@@ -783,16 +783,22 @@ function updateSimulation() {
     if (!selectedSubbasin) return;
 
     const props = selectedSubbasin.feature.properties;
+    const basinId = props.Basin_ID || props.DN;
+
+    // If a simulation has been run, show that basin's actual discharge from results
+    if (window.simModeActive && window.lastSimResult) {
+        const simBasin = (window.lastSimResult.basin_summary || [])
+            .find(b => b.basin_id == basinId);
+        if (simBasin) {
+            document.getElementById('est-discharge-value').textContent =
+                `${simBasin.discharge_m3s.toFixed(2)} m³/s (${window.lastSimResult.scenario})`;
+            return;
+        }
+    }
+
+    // Fallback: live sensor calculation using Rational Method
     const areaKm2 = props.Area_km2 || 0;
-    const C = 0.736; // Rational Method Runoff Coefficient
-
-    // Q = C * i * A
-    // i in m/s = intensity_mm_hr / (1000 * 3600)
-    // A in m2 = area_km2 * 1,000,000
-    // Q = C * (i/3600) * (A) / 1000
-    // Simplified: Q = (C * i * A) / 360
-    const intensity_mm_hr = currentIntensity;
-    const discharge = (C * intensity_mm_hr * areaKm2) / 3.6; // Correct conversion for m3/s
-
+    const C = 0.736;
+    const discharge = (C * currentIntensity * areaKm2) / 3.6;
     document.getElementById('est-discharge-value').textContent = `${discharge.toFixed(2)} m³/s`;
 }
