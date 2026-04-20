@@ -714,6 +714,7 @@ async function fetchCurrentStatus() {
 }
 
 function updateMetrics(data) {
+    if (window.simModeActive) return;
     const rainfall = data.latest_rainfall_mm || 0;
     currentIntensity = rainfall;
 

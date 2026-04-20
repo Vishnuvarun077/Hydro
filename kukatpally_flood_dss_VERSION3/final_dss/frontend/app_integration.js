@@ -461,7 +461,11 @@ function injectIntegrationUI() {
 }
 
 function openInt()  { document.getElementById('int-overlay').style.display = 'block'; showIntTab('sim'); updateScenPreview(); }
-function closeInt() { document.getElementById('int-overlay').style.display = 'none'; }
+function closeInt() {
+    document.getElementById('int-overlay').style.display = 'none';
+    window.simModeActive = false;
+    if (typeof fetchCurrentStatus === 'function') fetchCurrentStatus();
+}
 
 function showIntTab(id) {
     document.querySelectorAll('.itab').forEach(b => b.classList.toggle('active-itab', b.dataset.tab === id));
@@ -582,6 +586,37 @@ function renderSim(data) {
      }).join('')}</tbody></table>`;
 
     colorMapBasins(basins);
+
+    // Push simulation results to main dashboard KPI cards
+    syncDashboardWithSimulation(data);
+}
+
+function syncDashboardWithSimulation(data) {
+    const peakBasin = (data.basin_summary || []).find(b => b.basin_id === data.peak_basin_id)
+                   || (data.basin_summary || [])[0];
+    const peakIntensity = peakBasin ? peakBasin.rain_intensity_mmhr : 0;
+
+    if (typeof window.currentIntensity !== 'undefined') {
+        window.currentIntensity = peakIntensity;
+    }
+
+    const rainfallEl   = document.getElementById('rainfall-value');
+    const dischargeEl  = document.getElementById('discharge-value');
+    const riskCardEl   = document.getElementById('risk-card');
+    const riskLevelEl  = document.getElementById('risk-level');
+    const riskMsgEl    = document.getElementById('risk-message');
+    const lastUpdateEl = document.getElementById('last-update');
+
+    if (rainfallEl)   rainfallEl.textContent   = peakIntensity.toFixed(1);
+    if (dischargeEl)  dischargeEl.textContent  = data.peak_discharge_m3s.toFixed(1);
+    if (lastUpdateEl) lastUpdateEl.textContent = new Date().toLocaleTimeString();
+
+    const risk = (data.overall_risk_level || 'NORMAL').toLowerCase();
+    if (riskCardEl)  riskCardEl.className    = `status-card risk-card ${risk}`;
+    if (riskLevelEl) riskLevelEl.textContent = data.overall_risk_level || 'NORMAL';
+    if (riskMsgEl)   riskMsgEl.textContent   = `Simulation: ${data.scenario} | ${data.year_range}`;
+
+    window.simModeActive = true;
 }
 
 function colorMapBasins(basins) {
