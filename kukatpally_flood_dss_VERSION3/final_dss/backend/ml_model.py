@@ -85,9 +85,14 @@ def train_model() -> dict:
 
 def _load_model():
     if not MODEL_PATH.exists():
-        logger.warning("Model not found — auto-training now. This takes ~30 seconds...")
+        logger.warning("Model not found — auto-training now (~30s)...")
         train_model()
-    return joblib.load(MODEL_PATH)
+    try:
+        return joblib.load(MODEL_PATH)
+    except Exception:
+        logger.warning("Model file incompatible (sklearn version mismatch) — retraining...")
+        train_model()
+        return joblib.load(MODEL_PATH)
 
 
 def _prep_csv(path: Path) -> pd.DataFrame:

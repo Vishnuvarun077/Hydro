@@ -96,6 +96,11 @@
 
         <!-- Right Panel - Status -->
         <aside class="right-panel">
+            <div id="sim-mode-banner" style="display:none;background:#0d2a1a;border:1px solid #00cc66;border-radius:6px;padding:8px 12px;margin-bottom:8px;display:none;align-items:center;gap:8px;font-size:11px">
+                <span style="color:#00cc66;font-weight:700">&#x25CF; SIM MODE</span>
+                <span id="sim-mode-label" style="color:#8ba5c0;flex:1"></span>
+                <button onclick="returnToLive()" style="background:#1e2d3d;border:1px solid #2a3f5a;color:#00d4ff;padding:3px 10px;border-radius:3px;cursor:pointer;font-size:10px;font-weight:700">Return to Live</button>
+            </div>
             <div class="status-card risk-card normal" id="risk-card">
                 <div class="card-header"><i class="fas fa-exclamation-triangle"></i> FLOOD RISK</div>
                 <div class="card-body">

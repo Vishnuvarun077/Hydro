@@ -463,7 +463,13 @@ function injectIntegrationUI() {
 function openInt()  { document.getElementById('int-overlay').style.display = 'block'; showIntTab('sim'); updateScenPreview(); }
 function closeInt() {
     document.getElementById('int-overlay').style.display = 'none';
+    // Keep simModeActive = true so dashboard retains simulation values after closing
+}
+
+function returnToLive() {
     window.simModeActive = false;
+    const banner = document.getElementById('sim-mode-banner');
+    if (banner) banner.style.display = 'none';
     if (typeof fetchCurrentStatus === 'function') fetchCurrentStatus();
 }
 
@@ -617,6 +623,11 @@ function syncDashboardWithSimulation(data) {
     if (riskMsgEl)   riskMsgEl.textContent   = `Simulation: ${data.scenario} | ${data.year_range}`;
 
     window.simModeActive = true;
+
+    const banner = document.getElementById('sim-mode-banner');
+    const label  = document.getElementById('sim-mode-label');
+    if (banner) banner.style.display = 'flex';
+    if (label)  label.textContent    = `${data.scenario} | ${data.year_range} — Peak Q: ${data.peak_discharge_m3s.toFixed(1)} m³/s`;
 }
 
 function colorMapBasins(basins) {

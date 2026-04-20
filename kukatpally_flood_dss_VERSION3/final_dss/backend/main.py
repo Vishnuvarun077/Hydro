@@ -77,16 +77,28 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # ── Auto-train ML model on first startup if model file is missing ─────────────
 @app.on_event("startup")
 async def auto_train_model():
+    import asyncio
+    loop = asyncio.get_event_loop()
+    needs_train = False
+
     if not MODEL_PATH.exists():
-        import asyncio
-        loop = asyncio.get_event_loop()
+        print("[Startup] Model not found — training now (~30s)...")
+        needs_train = True
+    else:
+        try:
+            import joblib as _jl
+            _jl.load(MODEL_PATH)
+            print("[Startup] ML model found — skipping training.")
+        except Exception:
+            print("[Startup] Model file incompatible (sklearn version mismatch) — retraining...")
+            needs_train = True
+
+    if needs_train:
         try:
             metrics = await loop.run_in_executor(None, train_model)
             print(f"[Startup] Model trained — R²={metrics['r2_score']}, MAE={metrics['mae_mm_day']} mm/day")
         except Exception as e:
             print(f"[Startup] Model training failed: {e}")
-    else:
-        print("[Startup] ML model found — skipping training.")
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
